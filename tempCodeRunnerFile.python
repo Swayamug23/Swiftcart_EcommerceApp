@@ -1,0 +1,97 @@
+#Implement union , intersection, , compliment and difference operations on fuzzy sets
+
+def union(setA, setB):
+    result = {}
+    
+    all_elements = set(setA.keys()) | set(setB.keys())
+    for x in all_elements:
+        a_val = setA.get(x, 0)   
+        b_val = setB.get(x, 0)   
+        result[x] = max(a_val, b_val)
+    return result
+
+
+def intersection(setA, setB):
+
+    result = {}
+    all_elements = set(setA.keys()) | set(setB.keys())
+    for x in all_elements:
+        a_val = setA.get(x, 0)
+        b_val = setB.get(x, 0)
+        result[x] = min(a_val, b_val)
+    return result
+
+
+def complement(setA):
+    
+    result = {}
+    for x, a_val in setA.items():
+        result[x] = 1 - a_val
+    return result
+
+
+def difference(setA, setB):
+    
+    result = {}
+    all_elements = set(setA.keys()) | set(setB.keys())
+    for x in all_elements:
+        a_val = setA.get(x, 0)
+        b_val = setB.get(x, 0)
+        result[x] = min(a_val, 1 - b_val)
+    return result
+
+def cartesian_product(setA, setB):
+    relation = {}
+    for x, a_val in setA.items():
+        for y, b_val in setB.items():
+            relation[(x, y)] = min(a_val, b_val)
+    return relation
+
+def print_relation(relation, setA, setB):
+    print("Fuzzy Relation Matrix:")
+    for x in setA:
+        row = []
+        for y in setB:
+            row.append(round(relation[(x, y)], 2))
+        print(row)
+
+def max_min_composition(R, S, setX, setY, setZ):
+    T = {}
+    for x in setX:
+        for z in setZ:
+            max_val = 0
+            for y in setY:
+                max_val = max(max_val, min(R[(x, y)], S[(y, z)]))
+            T[(x, z)] = max_val
+    return T
+
+
+A = {'x1': 0.2, 'x2': 0.7, 'x3': 1.0}
+B = {'y1': 0.5, 'y2': 0.9}
+C = {'z1': 0.6, 'z2': 0.8}
+
+
+print("Fuzzy Set A:", A)
+print("Fuzzy Set B:", B)
+
+print("\nUnion (A ∪ B):", union(A, B))
+print("Intersection (A ∩ B):", intersection(A, B))
+print("Complement of A (Aᶜ):", complement(A))
+print("Difference (A - B):", difference(A, B))
+
+
+R = cartesian_product(A, B)
+S = cartesian_product(B, C)
+
+print("Relation R (A x B):")
+print_relation(R, A, B)
+
+print("\nRelation S (B x C):")
+print_relation(S, B, C)
+
+
+T = max_min_composition(R, S, A, B, C)
+
+print("\nComposition T = R o S (A x C):")
+print_relation(T, A, C)
+

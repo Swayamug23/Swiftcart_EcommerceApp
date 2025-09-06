@@ -1,103 +1,215 @@
+"use client";
+import { useEffect, useState } from "react";
+import Navbar from "@/components/Navbar";
+import Link from "next/link";
+import { ToastContainer, toast, Bounce } from "react-toastify";
+import { useCart } from "@/context/cartContext";
+import { useSession } from "next-auth/react";
+import Filter from "@/components/Filter";
 import Image from "next/image";
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [products, setProducts] = useState([]);
+  const [selected, setSelected] = useState([]);
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "admin";
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  useEffect(() => {
+    async function loadProducts() {
+      const res = await fetch("/api/products");
+      const data = await res.json();
+      setProducts(data.products || []);
+    }
+    loadProducts();
+  }, []);
+
+  const handleSelect = (id) => {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id]
+    );
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this product?")) return;
+    const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+    const data = await res.json();
+    if (data.success) {
+      setProducts((prev) => prev.filter((p) => p._id !== id));
+      toast.success("Product deleted!");
+    } else {
+      toast.error(data.error || "Failed to delete.");
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selected.length === 0) return;
+    if (!window.confirm("Delete selected products?")) return;
+    const res = await fetch("/api/products/deleteMany", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: selected }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      setProducts((prev) => prev.filter((p) => !selected.includes(p._id)));
+      setSelected([]);
+      toast.success("Selected products deleted!");
+    } else {
+      toast.error(data.error || "Failed to delete selected.");
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!window.confirm("Delete ALL products?")) return;
+    const res = await fetch("/api/products/deleteMany", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: products.map((p) => p._id) }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      setProducts([]);
+      setSelected([]);
+      toast.success("All products deleted!");
+    } else {
+      toast.error(data.error || "Failed to delete all.");
+    }
+  };
+
+  const { addToCart } = useCart();
+
+  return (
+    <>
+      <ToastContainer
+        position="top-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick={false}
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+        transition={Bounce}
+      />
+      <div className="">
+        <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6 sm:py-10 lg:max-w-7xl lg:px-8">
+
+          <Filter
+            onSearch={async ({ category, query, sort }) => {
+              
+                fetch(`/api/products?category=${category}&q=${query}&sort=${sort}`)
+                  .then(res => res.json())
+                  .then(data => setProducts(data.products || []))
+                  .catch(err => console.error(err));
+                
+
+                
+                
+              
+            }}
+          />
+          <h2 className="text-2xl font-bold tracking-tight text-gray-900">Customers also purchased</h2>
+
+
+
+          {isAdmin && (
+            <div className="flex gap-4 my-4">
+              <button
+                className="bg-red-600 text-white px-4 py-2 rounded font-bold"
+                onClick={handleDeleteAll}
+              >
+                Delete All
+              </button>
+              <button
+                className="bg-red-500 text-white px-4 py-2 rounded font-bold"
+                onClick={handleDeleteSelected}
+                disabled={selected.length === 0}
+              >
+                Delete Selected
+              </button>
+            </div>
+          )}
+
+          <div className="mt-6 grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:gap-x-12">
+            {products.map((product) => (
+              <div key={product._id} className="group p-4 rounded-lg shadow relative">
+                {isAdmin && (
+                  <input
+                    type="checkbox"
+                    className="absolute top-2 left-2 w-5 h-5"
+                    checked={selected.includes(product._id)}
+                    onChange={() => handleSelect(product._id)}
+                  />
+                )}
+                <Image
+                  alt={product.title}
+                  src={product.image[0]}
+                  className="aspect-square w-full rounded-lg bg-gray-200 object-cover lg:aspect-auto lg:h-80"
+                />
+
+                <div className="p-2">
+                  <h3 className="text-sm mt-2 capitalize font-bold">{product.title}</h3>
+                  <div className="my-2 flex justify-between">
+                    <p className="text-sm font-medium text-gray-900">₹{product.price}</p>
+                    <p className="text-sm font-medium text-gray-900">In Stock: {product.inStock}</p>
+                  </div>
+                  <div>
+                    <p className="mt-1 text-sm h-16 overflow-hidden text-gray-500">{product.description}</p>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    {isAdmin ? (
+                      <>
+                        <Link
+                          href={`/CreateProduct?id=${product._id}`}
+                          className="bg-gradient-to-r from-indigo-500 via-blue-500 to-sky-500 mt-3 hover:opacity-65 cursor-pointer text-white font-bold py-2 px-6 rounded-lg shadow-md transition duration-300 ease-in-out"
+                        >
+                          Edit
+                        </Link>
+                        <button
+                          className="bg-red-500 mt-3 hover:opacity-65 cursor-pointer text-white font-bold py-2 px-6 rounded-lg shadow-md transition duration-300 ease-in-out"
+                          onClick={() => handleDelete(product._id)}
+                        >
+                          Delete
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <Link
+                          href={`/product/${product._id}`}
+                          className="bg-gradient-to-r from-indigo-500 via-blue-500 to-sky-500 mt-3 hover:opacity-65 cursor-pointer text-white font-bold py-2 px-6 rounded-lg shadow-md transition duration-300 ease-in-out"
+                        >
+                          View
+                        </Link>
+                        <button
+                          className="bg-gradient-to-r from-indigo-500 via-blue-500 to-sky-500 mt-3 hover:opacity-65 mt-3 cursor-pointer text-white font-bold py-2 px-6 rounded-lg shadow-md transition duration-300 ease-in-out"
+                          onClick={() => {
+                            addToCart(product);
+                            toast('Added To Cart', {
+                              position: "top-right",
+                              autoClose: 5000,
+                              hideProgressBar: false,
+                              closeOnClick: false,
+                              pauseOnHover: true,
+                              draggable: true,
+                              progress: undefined,
+                              theme: "light",
+                              transition: Bounce,
+                            });
+                          }}
+                        >
+                          Buy
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </div>
+    </>
   );
 }
